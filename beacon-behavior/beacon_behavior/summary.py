@@ -2,7 +2,12 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from .models import BeaconEvent
-from .trajectory import ActionType, build_trajectory
+from .trajectory import (
+    ActionType,
+    build_trajectory,
+    get_modified_file_paths,
+    get_patch_operation_count,
+)
 
 
 @dataclass
@@ -18,6 +23,9 @@ class SessionSummary:
     cached_input_tokens: int
     output_tokens: int
     reasoning_tokens: int
+    patch_operations: int
+    files_modified: int
+    modified_files: list[str]
     behavior_pattern: str
 
 
@@ -35,6 +43,9 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
             cached_input_tokens=0,
             output_tokens=0,
             reasoning_tokens=0,
+            patch_operations=0,
+            files_modified=0,
+            modified_files=[],
             behavior_pattern="UNKNOWN",
         )
 
@@ -230,6 +241,13 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
                 else 0
             )
 
+    #
+    # File modification metrics
+    #
+    modified_files = sorted(get_modified_file_paths(events))
+    patch_operations = get_patch_operation_count(events)
+    files_modified = len(modified_files)
+
     return SessionSummary(
         outcome=outcome,
         duration_seconds=duration_seconds,
@@ -242,6 +260,9 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
         cached_input_tokens=cached_input_tokens,
         output_tokens=output_tokens,
         reasoning_tokens=reasoning_tokens,
+        patch_operations=patch_operations,
+        files_modified=files_modified,
+        modified_files=modified_files,
         behavior_pattern=behavior_pattern,
     )
 

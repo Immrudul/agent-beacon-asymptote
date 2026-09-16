@@ -1,3 +1,5 @@
+import json
+import re
 from enum import Enum
 
 from .models import BeaconEvent
@@ -32,6 +34,80 @@ def get_command_output(event: BeaconEvent) -> str:
     raw = event.raw or {}
     attributes = raw.get("attributes", {})
     return attributes.get("output", "")
+
+
+PATCH_FILE_PATTERN = re.compile(
+    r"^\*\*\* (?:Add|Delete|Update) File: (.+)$",
+    re.MULTILINE,
+)
+
+
+def get_patch_text(event: BeaconEvent) -> str:
+    """Return the apply_patch payload for a Beacon event."""
+    patch = (event.tool or {}).get("command", "")
+
+    if isinstance(patch, str) and patch:
+        return patch
+
+    arguments = (
+        ((event.gen_ai or {}).get("tool") or {})
+        .get("call", {})
+        .get("arguments", "")
+    )
+
+    if isinstance(arguments, dict):
+        return json.dumps(arguments)
+
+    if not isinstance(arguments, str):
+        return ""
+
+    try:
+        parsed = json.loads(arguments)
+    except json.JSONDecodeError:
+        return arguments
+
+    if isinstance(parsed, dict):
+        for key in ("patch", "command", "input"):
+            value = parsed.get(key)
+            if isinstance(value, str):
+                return value
+
+    return arguments
+
+
+def get_patch_file_paths(event: BeaconEvent) -> set[str]:
+    """Return file paths declared in an apply_patch payload."""
+    return {
+        match.group(1).strip()
+        for match in PATCH_FILE_PATTERN.finditer(get_patch_text(event))
+        if match.group(1).strip()
+    }
+
+
+def get_modified_file_paths(events: list[BeaconEvent]) -> set[str]:
+    """Return all distinct files named in apply_patch calls."""
+    files: set[str] = set()
+
+    for event in events:
+        if event.action != "tool.invoked":
+            continue
+
+        if (event.tool or {}).get("name") != "apply_patch":
+            continue
+
+        files.update(get_patch_file_paths(event))
+
+    return files
+
+
+def get_patch_operation_count(events: list[BeaconEvent]) -> int:
+    """Count apply_patch operations in a run."""
+    return sum(
+        1
+        for event in events
+        if event.action == "tool.invoked"
+        and (event.tool or {}).get("name") == "apply_patch"
+    )
 
 
 def classify_event(event: BeaconEvent) -> list[TrajectoryAction]:

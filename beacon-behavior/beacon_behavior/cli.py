@@ -186,6 +186,25 @@ def show(
     )
 
     summary_table.add_row(
+        "Patch operations",
+        str(summary.patch_operations),
+    )
+
+    summary_table.add_row(
+        "Files modified",
+        str(summary.files_modified),
+    )
+
+    summary_table.add_row(
+        "Modified files",
+        (
+            ", ".join(Path(path).name for path in summary.modified_files)
+            if summary.modified_files
+            else "none"
+        ),
+    )
+
+    summary_table.add_row(
         "Behavior pattern",
         summary.behavior_pattern,
     )
@@ -450,6 +469,36 @@ def diff(
         "Reasoning tokens",
         f"{comparison.summary_a.reasoning_tokens:,}",
         f"{comparison.summary_b.reasoning_tokens:,}",
+    )
+
+    comparison_table.add_row(
+        "Patch operations",
+        str(comparison.summary_a.patch_operations),
+        str(comparison.summary_b.patch_operations),
+    )
+
+    comparison_table.add_row(
+        "Files modified",
+        str(comparison.summary_a.files_modified),
+        str(comparison.summary_b.files_modified),
+    )
+
+    comparison_table.add_row(
+        "Modified files",
+        (
+            ", ".join(
+                Path(path).name for path in comparison.summary_a.modified_files
+            )
+            if comparison.summary_a.modified_files
+            else "none"
+        ),
+        (
+            ", ".join(
+                Path(path).name for path in comparison.summary_b.modified_files
+            )
+            if comparison.summary_b.modified_files
+            else "none"
+        ),
     )
 
     comparison_table.add_row(
