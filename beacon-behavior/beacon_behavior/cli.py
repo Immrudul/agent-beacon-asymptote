@@ -7,7 +7,11 @@ from rich.table import Table
 from .compare import build_comparison
 from .parser import load_events
 from .rules import evaluate_run, load_rules
-from .summary import build_summary, format_duration
+from .summary import (
+    build_summary,
+    format_duration,
+    format_optional_duration,
+)
 from .trajectory import build_trajectory
 
 
@@ -208,6 +212,24 @@ def show(
             if summary.modified_files
             else "none"
         ),
+    )
+
+    summary_table.add_row("Tool calls", str(summary.tool_calls))
+    summary_table.add_row(
+        "Commands executed",
+        str(summary.commands_executed),
+    )
+    summary_table.add_row(
+        "Trajectory length",
+        str(summary.trajectory_length),
+    )
+    summary_table.add_row(
+        "Time to first test",
+        format_optional_duration(summary.time_to_first_test_seconds),
+    )
+    summary_table.add_row(
+        "Time to patch",
+        format_optional_duration(summary.time_to_patch_seconds),
     )
 
     summary_table.add_row(
@@ -511,6 +533,32 @@ def diff(
             if comparison.summary_b.modified_files
             else "none"
         ),
+    )
+
+    comparison_table.add_row(
+        "Tool calls",
+        str(comparison.summary_a.tool_calls),
+        str(comparison.summary_b.tool_calls),
+    )
+    comparison_table.add_row(
+        "Commands executed",
+        str(comparison.summary_a.commands_executed),
+        str(comparison.summary_b.commands_executed),
+    )
+    comparison_table.add_row(
+        "Trajectory length",
+        str(comparison.summary_a.trajectory_length),
+        str(comparison.summary_b.trajectory_length),
+    )
+    comparison_table.add_row(
+        "Time to first test",
+        format_optional_duration(comparison.summary_a.time_to_first_test_seconds),
+        format_optional_duration(comparison.summary_b.time_to_first_test_seconds),
+    )
+    comparison_table.add_row(
+        "Time to patch",
+        format_optional_duration(comparison.summary_a.time_to_patch_seconds),
+        format_optional_duration(comparison.summary_b.time_to_patch_seconds),
     )
 
     comparison_table.add_row(

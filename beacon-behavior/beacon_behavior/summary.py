@@ -27,6 +27,11 @@ class SessionSummary:
     patch_operations: int
     files_modified: int
     modified_files: list[str]
+    tool_calls: int
+    commands_executed: int
+    trajectory_length: int
+    time_to_first_test_seconds: int | None
+    time_to_patch_seconds: int | None
     behavior_pattern: str
 
 
@@ -48,6 +53,11 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
             patch_operations=0,
             files_modified=0,
             modified_files=[],
+            tool_calls=0,
+            commands_executed=0,
+            trajectory_length=0,
+            time_to_first_test_seconds=None,
+            time_to_patch_seconds=None,
             behavior_pattern="UNKNOWN",
         )
 
@@ -257,6 +267,80 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
     patch_operations = get_patch_operation_count(events)
     files_modified = len(modified_files)
 
+    #
+    # Behavioral efficiency metrics
+    #
+    tool_calls = sum(
+        1
+        for event in events
+        if event.action == "tool.invoked"
+    )
+
+    commands_executed = sum(
+        1
+        for event in events
+        if event.action == "command.executed"
+    )
+
+    semantic_trajectory = build_trajectory(
+        events,
+        verbose=False,
+    )
+
+    trajectory_length = sum(
+        1
+        for action in semantic_trajectory
+        if action.action_type
+        not in {
+            ActionType.PROMPT,
+            ActionType.TOKENS,
+        }
+    )
+
+    prompt_time = next(
+        (
+            event.timestamp
+            for event in events
+            if event.action == "prompt.submitted"
+        ),
+        None,
+    )
+
+    first_test_time = next(
+        (
+            action.event.timestamp
+            for action in trajectory
+            if action.action_type
+            in {
+                ActionType.ENV_ERROR,
+                ActionType.TEST_FAIL,
+                ActionType.TEST_PASS,
+            }
+        ),
+        None,
+    )
+
+    patch_time = next(
+        (
+            action.event.timestamp
+            for action in trajectory
+            if action.action_type == ActionType.PATCH
+        ),
+        None,
+    )
+
+    time_to_first_test_seconds = (
+        int((first_test_time - prompt_time).total_seconds())
+        if prompt_time and first_test_time
+        else None
+    )
+
+    time_to_patch_seconds = (
+        int((patch_time - prompt_time).total_seconds())
+        if prompt_time and patch_time
+        else None
+    )
+
     return SessionSummary(
         outcome=outcome,
         duration_seconds=duration_seconds,
@@ -273,6 +357,11 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
         patch_operations=patch_operations,
         files_modified=files_modified,
         modified_files=modified_files,
+        tool_calls=tool_calls,
+        commands_executed=commands_executed,
+        trajectory_length=trajectory_length,
+        time_to_first_test_seconds=time_to_first_test_seconds,
+        time_to_patch_seconds=time_to_patch_seconds,
         behavior_pattern=behavior_pattern,
     )
 
@@ -293,3 +382,10 @@ def format_duration(seconds: int) -> str:
         return f"{minutes}m {seconds}s"
 
     return f"{seconds}s"
+
+
+def format_optional_duration(seconds: int | None) -> str:
+    if seconds is None:
+        return "n/a"
+
+    return format_duration(seconds)
