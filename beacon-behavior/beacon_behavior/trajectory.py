@@ -10,6 +10,7 @@ class ActionType(str, Enum):
     INSPECT_REPO = "INSPECT_REPO"
     READ_CODE = "READ_CODE"
     DIAGNOSE = "DIAGNOSE"
+    ENV_ERROR = "ENV_ERROR"
     TEST_FAIL = "TEST_FAIL"
     TEST_PASS = "TEST_PASS"
     PATCH = "PATCH"
@@ -34,6 +35,25 @@ def get_command_output(event: BeaconEvent) -> str:
     raw = event.raw or {}
     attributes = raw.get("attributes", {})
     return attributes.get("output", "")
+
+
+def is_environment_error(output: str) -> bool:
+    """Return whether a command failed because its environment was unready."""
+    output = output.lower()
+
+    environment_error_patterns = [
+        "no module named",
+        "modulenotfounderror",
+        "command not found",
+        "is not recognized as the name of a cmdlet",
+        "is not recognized as an internal or external command",
+        "executable file not found",
+    ]
+
+    return any(
+        pattern in output
+        for pattern in environment_error_patterns
+    )
 
 
 PATCH_FILE_PATTERN = re.compile(
@@ -233,7 +253,16 @@ def classify_event(event: BeaconEvent) -> list[TrajectoryAction]:
         # Test execution
         #
         if "pytest" in lower:
-            if "passed" in output_lower:
+            if is_environment_error(output):
+                results.append(
+                    TrajectoryAction(
+                        ActionType.ENV_ERROR,
+                        "Test environment error",
+                        event,
+                    )
+                )
+
+            elif "passed" in output_lower:
                 results.append(
                     TrajectoryAction(
                         ActionType.TEST_PASS,
@@ -245,7 +274,6 @@ def classify_event(event: BeaconEvent) -> list[TrajectoryAction]:
             elif (
                 "failed" in output_lower
                 or "error" in output_lower
-                or "no module named pytest" in output_lower
             ):
                 results.append(
                     TrajectoryAction(

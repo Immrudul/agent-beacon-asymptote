@@ -6,6 +6,7 @@ from rich.table import Table
 
 from .compare import build_comparison
 from .parser import load_events
+from .rules import evaluate_run, load_rules
 from .summary import build_summary, format_duration
 from .trajectory import build_trajectory
 
@@ -149,6 +150,11 @@ def show(
     summary_table.add_row(
         "Failed attempts",
         str(summary.failed_attempts),
+    )
+
+    summary_table.add_row(
+        "Environment errors",
+        str(summary.environment_errors),
     )
 
     summary_table.add_row(
@@ -448,6 +454,12 @@ def diff(
     )
 
     comparison_table.add_row(
+        "Environment errors",
+        str(comparison.summary_a.environment_errors),
+        str(comparison.summary_b.environment_errors),
+    )
+
+    comparison_table.add_row(
         "Input tokens",
         f"{comparison.summary_a.input_tokens:,}",
         f"{comparison.summary_b.input_tokens:,}",
@@ -612,6 +624,68 @@ def diff(
     console.print(
         diff_table
     )
+
+
+@app.command("eval")
+def evaluate(
+    path: Path,
+    rules: Path = typer.Option(
+        ...,
+        "--rules",
+        "-r",
+        help="Path to behavioral rules YAML file.",
+    ),
+):
+    """Evaluate a Beacon run against behavioral rules."""
+    events = load_events(path)
+
+    if not events:
+        console.print(
+            f"No Beacon events found in {path}."
+        )
+        raise typer.Exit(code=1)
+
+    behavior_rules = load_rules(rules)
+    evaluation = evaluate_run(events, behavior_rules)
+
+    console.print()
+    console.print(
+        "[bold]Behavioral Evaluation[/bold]"
+    )
+    console.print()
+    console.print(f"Run:   {path.name}")
+    console.print(f"Rules: {rules.name}")
+    console.print()
+
+    evaluation_table = Table()
+    evaluation_table.add_column(
+        "Result",
+        style="bold",
+    )
+    evaluation_table.add_column("Rule")
+
+    for result in evaluation.results:
+        label = (
+            "[green]PASS[/green]"
+            if result.passed
+            else "[red]FAIL[/red]"
+        )
+        evaluation_table.add_row(
+            label,
+            result.description,
+        )
+
+    console.print(evaluation_table)
+    console.print()
+
+    if evaluation.passed:
+        console.print(
+            "[bold green]Result: PASS[/bold green]"
+        )
+    else:
+        console.print(
+            "[bold red]Result: FAIL[/bold red]"
+        )
 
 
 if __name__ == "__main__":

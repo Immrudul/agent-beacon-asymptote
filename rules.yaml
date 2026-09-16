@@ -1,0 +1,12 @@
+require:
+  - TEST_PASS
+
+require_after_patch:
+  - TEST_PASS
+
+# these can be changed to whatever whenever, just depends on what you want / task
+limits:
+  test_attempts: 3
+  files_modified: 2
+
+require_additional_verification: true

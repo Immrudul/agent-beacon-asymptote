@@ -17,6 +17,7 @@ class SessionSummary:
     task_duration_seconds: int
     test_attempts: int
     failed_attempts: int
+    environment_errors: int
     test_verification: bool
     additional_verification: bool
     input_tokens: int
@@ -37,6 +38,7 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
             task_duration_seconds=0,
             test_attempts=0,
             failed_attempts=0,
+            environment_errors=0,
             test_verification=False,
             additional_verification=False,
             input_tokens=0,
@@ -61,6 +63,7 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
         for action in trajectory
         if action.action_type
         in {
+            ActionType.ENV_ERROR,
             ActionType.TEST_FAIL,
             ActionType.TEST_PASS,
         }
@@ -95,6 +98,12 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
             if action.action_type == ActionType.PATCH
         ),
         None,
+    )
+
+    environment_errors = sum(
+        1
+        for action in trajectory
+        if action.action_type == ActionType.ENV_ERROR
     )
 
     test_verification = False
@@ -254,6 +263,7 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
         task_duration_seconds=task_duration_seconds,
         test_attempts=test_attempts,
         failed_attempts=failed_attempts,
+        environment_errors=environment_errors,
         test_verification=test_verification,
         additional_verification=additional_verification,
         input_tokens=input_tokens,
