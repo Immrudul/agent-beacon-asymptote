@@ -166,6 +166,26 @@ def show(
     )
 
     summary_table.add_row(
+        "Input tokens",
+        f"{summary.input_tokens:,}",
+    )
+
+    summary_table.add_row(
+        "Cached input tokens",
+        f"{summary.cached_input_tokens:,}",
+    )
+
+    summary_table.add_row(
+        "Output tokens",
+        f"{summary.output_tokens:,}",
+    )
+
+    summary_table.add_row(
+        "Reasoning tokens",
+        f"{summary.reasoning_tokens:,}",
+    )
+
+    summary_table.add_row(
         "Behavior pattern",
         summary.behavior_pattern,
     )
@@ -406,6 +426,30 @@ def diff(
             .summary_b
             .additional_verification
         ),
+    )
+
+    comparison_table.add_row(
+        "Input tokens",
+        f"{comparison.summary_a.input_tokens:,}",
+        f"{comparison.summary_b.input_tokens:,}",
+    )
+
+    comparison_table.add_row(
+        "Cached input tokens",
+        f"{comparison.summary_a.cached_input_tokens:,}",
+        f"{comparison.summary_b.cached_input_tokens:,}",
+    )
+
+    comparison_table.add_row(
+        "Output tokens",
+        f"{comparison.summary_a.output_tokens:,}",
+        f"{comparison.summary_b.output_tokens:,}",
+    )
+
+    comparison_table.add_row(
+        "Reasoning tokens",
+        f"{comparison.summary_a.reasoning_tokens:,}",
+        f"{comparison.summary_b.reasoning_tokens:,}",
     )
 
     comparison_table.add_row(

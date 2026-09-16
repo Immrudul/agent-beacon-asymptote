@@ -14,6 +14,10 @@ class SessionSummary:
     failed_attempts: int
     test_verification: bool
     additional_verification: bool
+    input_tokens: int
+    cached_input_tokens: int
+    output_tokens: int
+    reasoning_tokens: int
     behavior_pattern: str
 
 
@@ -27,6 +31,10 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
             failed_attempts=0,
             test_verification=False,
             additional_verification=False,
+            input_tokens=0,
+            cached_input_tokens=0,
+            output_tokens=0,
+            reasoning_tokens=0,
             behavior_pattern="UNKNOWN",
         )
 
@@ -182,6 +190,46 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
     else:
         task_duration_seconds = duration_seconds
 
+    #
+    # Token usage
+    #
+    input_tokens = 0
+    cached_input_tokens = 0
+    output_tokens = 0
+    reasoning_tokens = 0
+
+    for event in events:
+        if event.action != "token.usage":
+            continue
+
+        gen_ai = event.gen_ai or {}
+        usage = gen_ai.get("usage", {})
+
+        if not isinstance(usage, dict):
+            continue
+
+        input = usage.get("input_tokens", 0)
+        input_tokens += input if isinstance(input, int) else 0
+
+        cache_read = usage.get("cache_read", {})
+        if isinstance(cache_read, dict):
+            cached_input = cache_read.get("input_tokens", 0)
+            cached_input_tokens += (
+                cached_input if isinstance(cached_input, int) else 0
+            )
+
+        output = usage.get("output_tokens", 0)
+        output_tokens += output if isinstance(output, int) else 0
+
+        reasoning = usage.get("reasoning", {})
+        if isinstance(reasoning, dict):
+            reasoning_output = reasoning.get("output_tokens", 0)
+            reasoning_tokens += (
+                reasoning_output
+                if isinstance(reasoning_output, int)
+                else 0
+            )
+
     return SessionSummary(
         outcome=outcome,
         duration_seconds=duration_seconds,
@@ -190,6 +238,10 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
         failed_attempts=failed_attempts,
         test_verification=test_verification,
         additional_verification=additional_verification,
+        input_tokens=input_tokens,
+        cached_input_tokens=cached_input_tokens,
+        output_tokens=output_tokens,
+        reasoning_tokens=reasoning_tokens,
         behavior_pattern=behavior_pattern,
     )
 
