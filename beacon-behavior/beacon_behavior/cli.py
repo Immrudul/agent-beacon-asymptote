@@ -13,8 +13,19 @@ console = Console()
 
 
 @app.command()
-def show(path: Path):
-    """Show the ordered events and behavioral trajectory from a Beacon JSONL trace."""
+def show(
+    path: Path,
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed behavioral actions instead of compressed phases.",
+    ),
+):
+    """
+    Show the ordered events and behavioral trajectory
+    from a Beacon JSONL trace.
+    """
 
     events = load_events(path)
 
@@ -48,10 +59,18 @@ def show(path: Path):
 
     console.print(raw_table)
 
-    trajectory = build_trajectory(events)
+    trajectory = build_trajectory(
+        events,
+        verbose=verbose,
+    )
 
     console.print()
-    console.print("[bold]Behavioral Trajectory[/bold]")
+
+    if verbose:
+        console.print("[bold]Detailed Behavioral Trajectory[/bold]")
+    else:
+        console.print("[bold]Behavioral Trajectory[/bold]")
+
     console.print()
 
     trajectory_table = Table()

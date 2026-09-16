@@ -7,6 +7,7 @@ class ActionType(str, Enum):
     PROMPT = "PROMPT"
     INSPECT_REPO = "INSPECT_REPO"
     READ_CODE = "READ_CODE"
+    DIAGNOSE = "DIAGNOSE"
     TEST_FAIL = "TEST_FAIL"
     TEST_PASS = "TEST_PASS"
     PATCH = "PATCH"
@@ -64,8 +65,7 @@ def classify_event(event: BeaconEvent) -> list[TrajectoryAction]:
     if action == "tool.invoked":
         tool_name = (event.tool or {}).get("name", "unknown")
 
-        # Codex emits generic exec wrapper events alongside
-        # the actual command.executed event, so skip those.
+        # Generic Codex wrapper around a command.
         if tool_name == "exec":
             return results
 
@@ -77,7 +77,6 @@ def classify_event(event: BeaconEvent) -> list[TrajectoryAction]:
                     event,
                 )
             )
-
             return results
 
         results.append(
@@ -90,12 +89,10 @@ def classify_event(event: BeaconEvent) -> list[TrajectoryAction]:
 
         return results
 
-    if action == "approval.requested":
-        # Keep approvals in raw telemetry,
-        # but exclude them from the behavioral story.
-        return results
-
-    if action == "session.started":
+    if action in {
+        "approval.requested",
+        "session.started",
+    }:
         return results
 
     if action == "command.executed":
@@ -136,7 +133,7 @@ def classify_event(event: BeaconEvent) -> list[TrajectoryAction]:
             )
 
         #
-        # Reading tests / implementation
+        # Reading code
         #
         if "get-content" in lower and "test_solver.py" in lower:
             results.append(
@@ -212,9 +209,6 @@ def classify_event(event: BeaconEvent) -> list[TrajectoryAction]:
                 )
             )
 
-        #
-        # Fallback
-        #
         if not results:
             results.append(
                 TrajectoryAction(
@@ -235,7 +229,7 @@ def deduplicate_consecutive(
     if not actions:
         return []
 
-    compressed: list[TrajectoryAction] = [actions[0]]
+    compressed = [actions[0]]
 
     for action in actions[1:]:
         previous = compressed[-1]
@@ -251,13 +245,85 @@ def deduplicate_consecutive(
     return compressed
 
 
+def compress_semantic_phases(
+    actions: list[TrajectoryAction],
+) -> list[TrajectoryAction]:
+    """
+    Convert detailed semantic actions into a cleaner,
+    developer-facing behavioral story.
+    """
+
+    compressed: list[TrajectoryAction] = []
+
+    i = 0
+
+    while i < len(actions):
+        current = actions[i]
+
+        #
+        # Collapse consecutive READ_CODE events into DIAGNOSE.
+        #
+        if current.action_type == ActionType.READ_CODE:
+            first_event = current.event
+
+            while (
+                i + 1 < len(actions)
+                and actions[i + 1].action_type == ActionType.READ_CODE
+            ):
+                i += 1
+
+            compressed.append(
+                TrajectoryAction(
+                    ActionType.DIAGNOSE,
+                    "Investigated failure",
+                    first_event,
+                )
+            )
+
+            i += 1
+            continue
+
+        #
+        # Collapse consecutive verification actions.
+        #
+        if current.action_type == ActionType.VERIFY:
+            first_event = current.event
+
+            while (
+                i + 1 < len(actions)
+                and actions[i + 1].action_type == ActionType.VERIFY
+            ):
+                i += 1
+
+            compressed.append(
+                TrajectoryAction(
+                    ActionType.VERIFY,
+                    "Verified fix",
+                    first_event,
+                )
+            )
+
+            i += 1
+            continue
+
+        compressed.append(current)
+        i += 1
+
+    return compressed
+
+
 def build_trajectory(
     events: list[BeaconEvent],
+    verbose: bool = False,
 ) -> list[TrajectoryAction]:
-    trajectory: list[TrajectoryAction] = []
+    detailed: list[TrajectoryAction] = []
 
     for event in events:
-        actions = classify_event(event)
-        trajectory.extend(actions)
+        detailed.extend(classify_event(event))
 
-    return deduplicate_consecutive(trajectory)
+    detailed = deduplicate_consecutive(detailed)
+
+    if verbose:
+        return detailed
+
+    return compress_semantic_phases(detailed)
