@@ -732,7 +732,24 @@ replay
 capture
 ```
 
-For example:
+## Recommended demo repo
+
+For the examples in this README, I used this small public test repository:
+
+https://github.com/Immrudul/test-repo
+
+It has a deliberately introduced bug and a tiny pytest suite, so it is a really easy way to try the full flow end to end without setting up a larger project.
+
+I’d recommend cloning it alongside this project if you want to reproduce the same kind of Codex + Beacon run:
+
+```bash
+git clone https://github.com/Immrudul/test-repo
+```
+
+Then you can run your coding agent against that repo, let Beacon capture the activity, and use the commands below to inspect, compare, replay, or evaluate the resulting trace.
+
+## Example commands
+
 
 ```bash
 beacon-behavior show ../fixtures/codex-run-1.jsonl
