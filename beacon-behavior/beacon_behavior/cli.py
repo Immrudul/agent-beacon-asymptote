@@ -5,6 +5,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .parser import load_events
+from .summary import build_summary, format_duration
 from .trajectory import build_trajectory
 
 
@@ -23,8 +24,7 @@ def show(
     ),
 ):
     """
-    Show the ordered events and behavioral trajectory
-    from a Beacon JSONL trace.
+    Show a Beacon session, summary, and behavioral trajectory.
     """
 
     events = load_events(path)
@@ -35,11 +35,88 @@ def show(
 
     first = events[0]
 
+    #
+    # Session metadata
+    #
+
     console.print()
     console.print("[bold]Beacon Session[/bold]")
     console.print(f"Session: {first.session_id}")
     console.print(f"Harness: {first.harness_name}")
     console.print(f"Model:   {first.model or 'unknown'}")
+    console.print()
+
+    #
+    # Session summary
+    #
+
+    summary = build_summary(events)
+
+    summary_table = Table(
+        title="Session Summary",
+        show_header=False,
+    )
+
+    summary_table.add_column(
+        "Metric",
+        style="bold",
+    )
+
+    summary_table.add_column(
+        "Value",
+    )
+
+    summary_table.add_row(
+        "Outcome",
+        summary.outcome,
+    )
+
+    summary_table.add_row(
+        "Session duration",
+        format_duration(
+            summary.duration_seconds
+        ),
+    )
+
+    summary_table.add_row(
+        "Task duration",
+        format_duration(
+            summary.task_duration_seconds
+        ),
+    )
+
+    summary_table.add_row(
+        "Test attempts",
+        str(summary.test_attempts),
+    )
+
+    summary_table.add_row(
+        "Failed attempts",
+        str(summary.failed_attempts),
+    )
+
+    summary_table.add_row(
+        "Successful verification",
+        (
+            "yes"
+            if summary.successful_verification
+            else "no"
+        ),
+    )
+
+    summary_table.add_row(
+        "Behavior pattern",
+        summary.behavior_pattern,
+    )
+
+    console.print(summary_table)
+
+    #
+    # Raw Beacon telemetry
+    #
+
+    console.print()
+    console.print("[bold]Raw Beacon Events[/bold]")
     console.print()
 
     raw_table = Table()
@@ -59,6 +136,10 @@ def show(
 
     console.print(raw_table)
 
+    #
+    # Behavioral trajectory
+    #
+
     trajectory = build_trajectory(
         events,
         verbose=verbose,
@@ -67,9 +148,13 @@ def show(
     console.print()
 
     if verbose:
-        console.print("[bold]Detailed Behavioral Trajectory[/bold]")
+        console.print(
+            "[bold]Detailed Behavioral Trajectory[/bold]"
+        )
     else:
-        console.print("[bold]Behavioral Trajectory[/bold]")
+        console.print(
+            "[bold]Behavioral Trajectory[/bold]"
+        )
 
     console.print()
 
@@ -81,7 +166,9 @@ def show(
 
     for action in trajectory:
         trajectory_table.add_row(
-            action.event.timestamp.strftime("%H:%M:%S"),
+            action.event.timestamp.strftime(
+                "%H:%M:%S"
+            ),
             action.action_type.value,
             action.label,
         )
