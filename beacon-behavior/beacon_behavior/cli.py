@@ -4,6 +4,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from .capture import (
+    DEFAULT_BEACON_LOG,
+    capture_latest_run,
+    write_run,
+)
 from .compare import build_comparison
 from .parser import load_events
 from .rules import evaluate_run, load_rules
@@ -16,6 +21,12 @@ from .trajectory import build_trajectory
 
 
 app = typer.Typer()
+capture_app = typer.Typer()
+
+app.add_typer(
+    capture_app,
+    name="capture",
+)
 
 console = Console()
 
@@ -734,6 +745,54 @@ def evaluate(
         console.print(
             "[bold red]Result: FAIL[/bold red]"
         )
+
+
+@capture_app.command("latest")
+def capture_latest(
+    output: Path = typer.Option(
+        Path("../fixtures/latest.jsonl"),
+        "--output",
+        "-o",
+        help="Output JSONL fixture path.",
+    ),
+    session: str | None = typer.Option(
+        None,
+        "--session",
+        help=(
+            "Optionally restrict capture to a specific Beacon session."
+        ),
+    ),
+    log: Path = typer.Option(
+        DEFAULT_BEACON_LOG,
+        "--log",
+        help="Beacon runtime JSONL log.",
+    ),
+):
+    """Capture the latest completed Beacon turn."""
+    try:
+        run = capture_latest_run(
+            log_path=log,
+            session_id=session,
+        )
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1)
+
+    output_path = write_run(run, output)
+
+    console.print()
+    console.print("[bold]Captured Beacon Run[/bold]")
+    console.print()
+    console.print(f"Session: {run.session_id}")
+    console.print(f"Events:  {len(run.events)}")
+    console.print(f"Start:   {run.start_timestamp}")
+    console.print(f"End:     {run.end_timestamp}")
+    console.print(f"Output:  {output_path}")
+    console.print()
+
+    if run.prompt:
+        console.print("[bold]Prompt[/bold]")
+        console.print(run.prompt)
 
 
 if __name__ == "__main__":
