@@ -12,7 +12,8 @@ class SessionSummary:
     task_duration_seconds: int
     test_attempts: int
     failed_attempts: int
-    successful_verification: bool
+    test_verification: bool
+    additional_verification: bool
     behavior_pattern: str
 
 
@@ -24,7 +25,8 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
             task_duration_seconds=0,
             test_attempts=0,
             failed_attempts=0,
-            successful_verification=False,
+            test_verification=False,
+            additional_verification=False,
             behavior_pattern="UNKNOWN",
         )
 
@@ -51,16 +53,6 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
         if action.action_type == ActionType.TEST_FAIL
     )
 
-    passed = any(
-        action.action_type == ActionType.TEST_PASS
-        for action in trajectory
-    )
-
-    verified = any(
-        action.action_type == ActionType.VERIFY
-        for action in trajectory
-    )
-
     patched = any(
         action.action_type == ActionType.PATCH
         for action in trajectory
@@ -72,10 +64,41 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
     )
 
     #
+    # Verification semantics
+    #
+    # A passing test and an additional inspection only count when they occur
+    # after the first patch. Pre-patch inspection is part of diagnosis.
+    #
+    patch_index = next(
+        (
+            i
+            for i, action in enumerate(trajectory)
+            if action.action_type == ActionType.PATCH
+        ),
+        None,
+    )
+
+    test_verification = False
+    additional_verification = False
+
+    if patch_index is not None:
+        actions_after_patch = trajectory[patch_index + 1 :]
+
+        test_verification = any(
+            action.action_type == ActionType.TEST_PASS
+            for action in actions_after_patch
+        )
+
+        additional_verification = any(
+            action.action_type == ActionType.VERIFY
+            for action in actions_after_patch
+        )
+
+    #
     # Outcome
     #
 
-    if passed:
+    if test_verification:
         outcome = "PASS"
     elif test_attempts > 0:
         outcome = "FAIL"
@@ -86,17 +109,22 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
     # High-level behavior pattern
     #
 
-    if diagnosed and patched and passed and verified:
+    if (
+        diagnosed
+        and patched
+        and test_verification
+        and additional_verification
+    ):
         behavior_pattern = "DEBUG_FIX_VERIFY"
 
-    elif patched and passed and verified:
+    elif diagnosed and patched and test_verification:
+        behavior_pattern = "DEBUG_FIX_TEST"
+
+    elif patched and test_verification and additional_verification:
         behavior_pattern = "FIX_VERIFY"
 
-    elif diagnosed and patched and passed:
-        behavior_pattern = "DEBUG_FIX"
-
-    elif patched and passed:
-        behavior_pattern = "FIX"
+    elif patched and test_verification:
+        behavior_pattern = "FIX_TEST"
 
     elif diagnosed and patched:
         behavior_pattern = "DEBUG_FIX_INCOMPLETE"
@@ -160,7 +188,8 @@ def build_summary(events: list[BeaconEvent]) -> SessionSummary:
         task_duration_seconds=task_duration_seconds,
         test_attempts=test_attempts,
         failed_attempts=failed_attempts,
-        successful_verification=verified,
+        test_verification=test_verification,
+        additional_verification=additional_verification,
         behavior_pattern=behavior_pattern,
     )
 

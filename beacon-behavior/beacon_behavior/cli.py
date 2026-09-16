@@ -96,10 +96,19 @@ def show(
     )
 
     summary_table.add_row(
-        "Successful verification",
+        "Test verification",
         (
             "yes"
-            if summary.successful_verification
+            if summary.test_verification
+            else "no"
+        ),
+    )
+
+    summary_table.add_row(
+        "Additional verification",
+        (
+            "yes"
+            if summary.additional_verification
             else "no"
         ),
     )

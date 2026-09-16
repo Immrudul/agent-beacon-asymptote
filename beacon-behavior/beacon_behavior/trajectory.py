@@ -255,10 +255,14 @@ def compress_semantic_phases(
 
     compressed: list[TrajectoryAction] = []
 
+    patch_seen = False
     i = 0
 
     while i < len(actions):
         current = actions[i]
+
+        if current.action_type == ActionType.PATCH:
+            patch_seen = True
 
         #
         # Collapse consecutive READ_CODE events into DIAGNOSE.
@@ -287,6 +291,18 @@ def compress_semantic_phases(
         # Collapse consecutive verification actions.
         #
         if current.action_type == ActionType.VERIFY:
+            if not patch_seen:
+                compressed.append(
+                    TrajectoryAction(
+                        ActionType.DIAGNOSE,
+                        "Investigated failure",
+                        current.event,
+                    )
+                )
+
+                i += 1
+                continue
+
             first_event = current.event
 
             while (
@@ -309,7 +325,7 @@ def compress_semantic_phases(
         compressed.append(current)
         i += 1
 
-    return compressed
+    return deduplicate_consecutive(compressed)
 
 
 def build_trajectory(
