@@ -1,0 +1,4 @@
+demo-task/
+.venv/
+__pycache__/
+*.pyc
