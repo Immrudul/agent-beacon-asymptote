@@ -11,6 +11,7 @@ from .capture import (
 )
 from .compare import build_comparison
 from .parser import load_events
+from .replay import build_replay_steps, describe_step
 from .rules import evaluate_run, load_rules
 from .summary import (
     build_summary,
@@ -745,6 +746,59 @@ def evaluate(
         console.print(
             "[bold red]Result: FAIL[/bold red]"
         )
+
+
+@app.command("replay")
+def replay(path: Path):
+    """Replay a Beacon run step-by-step."""
+    events = load_events(path)
+    steps = build_replay_steps(events)
+
+    if not steps:
+        console.print("[yellow]No replayable actions found.[/yellow]")
+        raise typer.Exit()
+
+    console.print()
+    console.print("[bold]Beacon Behavioral Replay[/bold]")
+    console.print(f"Run: {path.name}")
+    console.print()
+
+    for step in steps:
+        data = describe_step(step)
+        console.rule(
+            f"[bold]Step {step.index}/{step.total} {data['type']}[/bold]"
+        )
+        console.print(f"[dim]Elapsed:[/dim] {data['elapsed']}")
+        console.print(f"[dim]Semantics:[/dim] {data['semantics']}")
+
+        if "command" in data:
+            console.print()
+            console.print("[bold]Command[/bold]")
+            console.print(data["command"])
+
+        if "files" in data:
+            console.print()
+            console.print("[bold]Files[/bold]")
+            console.print(data["files"])
+
+        if "patch" in data:
+            console.print()
+            console.print("[bold]Patch[/bold]")
+            console.print(data["patch"])
+
+        if "output" in data:
+            console.print()
+            console.print("[bold]Output[/bold]")
+            console.print(data["output"])
+
+        console.print()
+
+        if step.index < step.total:
+            typer.prompt(
+                "Press Enter for next step",
+                default="",
+                show_default=False,
+            )
 
 
 @capture_app.command("latest")
